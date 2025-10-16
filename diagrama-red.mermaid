@@ -1,0 +1,60 @@
+graph TB
+    Internet((Internet))
+    
+    subgraph GCP["Google Cloud Platform"]
+        subgraph VPC["VPC: vpc-network<br/>10.0.0.0/16"]
+            Router[Cloud Router<br/>main-router]
+            NAT[Cloud NAT<br/>main-nat]
+            
+            subgraph Ventas["Subred de Ventas<br/>10.0.1.0/24"]
+                V1[10.0.1.1 Gateway]
+                V2[10.0.1.2 - 10.0.1.254<br/>254 hosts disponibles<br/>25 hosts requeridos]
+            end
+            
+            subgraph TI["Subred de TI<br/>10.0.2.0/24"]
+                T1[10.0.2.1 Gateway]
+                T2[10.0.2.2 - 10.0.2.254<br/>254 hosts disponibles<br/>15 hosts requeridos]
+            end
+            
+            subgraph DC["Subred de Data Center<br/>10.0.3.0/24"]
+                D1[10.0.3.1 Gateway]
+                D2[10.0.3.2 - 10.0.3.254<br/>254 hosts disponibles<br/>5 hosts requeridos]
+            end
+            
+            subgraph Visitas["Subred de Visitas<br/>10.0.4.0/24"]
+                Vi1[10.0.4.1 Gateway]
+                Vi2[10.0.4.2 - 10.0.4.254<br/>Acceso limitado]
+            end
+            
+            FW[Firewall Rules<br/>- allow-internal<br/>- allow-ssh<br/>- allow-icmp<br/>- allow-http-https<br/>- restrict-visitas]
+        end
+    end
+    
+    Internet <-->|NAT| NAT
+    NAT <--> Router
+    Router <--> Ventas
+    Router <--> TI
+    Router <--> DC
+    Router <--> Visitas
+    
+    FW -.->|Controla| Ventas
+    FW -.->|Controla| TI
+    FW -.->|Controla| DC
+    FW -.->|Controla| Visitas
+    
+    Ventas <-->|Permitido| TI
+    Ventas <-->|Permitido| DC
+    TI <-->|Permitido| DC
+    Visitas -.->|Bloqueado| TI
+    Visitas -.->|Bloqueado| DC
+    Visitas <-->|Permitido| Ventas
+    
+    style VPC fill:#e1f5ff
+    style Ventas fill:#c8e6c9
+    style TI fill:#fff9c4
+    style DC fill:#ffccbc
+    style Visitas fill:#f8bbd0
+    style Router fill:#b3e5fc
+    style NAT fill:#b3e5fc
+    style FW fill:#ffccbc
+    style Internet fill:#90caf9
