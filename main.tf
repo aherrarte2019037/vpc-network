@@ -9,10 +9,10 @@ resource "google_compute_network" "main_vpc" {
   description             = "VPC principal para la empresa - Proyecto Redes"
 }
 
-# Subred de Ventas - 10.0.1.0/24
+# Subred de Ventas - 10.0.0.64/27
 resource "google_compute_subnetwork" "ventas_subnet" {
-  name          = "subred-ventas"
-  ip_cidr_range = "10.0.1.0/24"
+  name          = "subnet-ventas-uscentral1-v2"
+  ip_cidr_range = "10.0.0.64/27"
   region        = var.region
   network       = google_compute_network.main_vpc.id
   description   = "Subred para el equipo de Ventas (25 hosts)"
@@ -24,10 +24,10 @@ resource "google_compute_subnetwork" "ventas_subnet" {
   }
 }
 
-# Subred de TI - 10.0.2.0/24
+# Subred de TI - 10.0.0.96/27
 resource "google_compute_subnetwork" "ti_subnet" {
-  name          = "subred-ti"
-  ip_cidr_range = "10.0.2.0/24"
+  name          = "subnet-ti-uscentral1-v2"
+  ip_cidr_range = "10.0.0.96/27"
   region        = var.region
   network       = google_compute_network.main_vpc.id
   description   = "Subred para el equipo de TI (15 hosts)"
@@ -39,10 +39,10 @@ resource "google_compute_subnetwork" "ti_subnet" {
   }
 }
 
-# Subred de Data Center - 10.0.3.0/24
+# Subred de Data Center - 10.0.0.128/28
 resource "google_compute_subnetwork" "datacenter_subnet" {
-  name          = "subred-datacenter"
-  ip_cidr_range = "10.0.3.0/24"
+  name          = "subnet-dc-uscentral1-v2"
+  ip_cidr_range = "10.0.0.128/28"
   region        = var.region
   network       = google_compute_network.main_vpc.id
   description   = "Subred para Data Center (5 servidores)"
@@ -54,10 +54,10 @@ resource "google_compute_subnetwork" "datacenter_subnet" {
   }
 }
 
-# Subred de Visitas - 10.0.4.0/24
+# Subred de Visitas - 10.0.0.0/26
 resource "google_compute_subnetwork" "visitas_subnet" {
-  name          = "subred-visitas"
-  ip_cidr_range = "10.0.4.0/24"
+  name          = "subnet-visitas-uscentral1-v2"
+  ip_cidr_range = "10.0.0.0/26"
   region        = var.region
   network       = google_compute_network.main_vpc.id
   description   = "Subred para visitantes (acceso limitado)"
@@ -89,10 +89,10 @@ resource "google_compute_firewall" "allow_internal" {
   }
 
   source_ranges = [
-    "10.0.1.0/24", # Ventas
-    "10.0.2.0/24", # TI
-    "10.0.3.0/24", # Data Center
-    "10.0.4.0/24"  # Visitas
+    "10.0.0.64/27", # Ventas
+    "10.0.0.96/27", # TI
+    "10.0.0.128/28", # Data Center
+    "10.0.0.0/26"  # Visitas
   ]
 
   description = "Permite todo el tráfico interno entre subredes"
@@ -154,10 +154,10 @@ resource "google_compute_firewall" "restrict_visitas" {
     protocol = "udp"
   }
 
-  source_ranges = ["10.0.4.0/24"] # Subred de Visitas
+  source_ranges = ["10.0.0.0/26"] # Subred de Visitas
   destination_ranges = [
-    "10.0.2.0/24", # TI
-    "10.0.3.0/24"  # Data Center
+    "10.0.0.96/27", # TI
+    "10.0.0.128/28"  # Data Center
   ]
 
   description = "Niega acceso de la red de Visitas a TI y Data Center"
