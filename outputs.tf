@@ -62,12 +62,31 @@ output "nat_name" {
 }
 
 output "firewall_rules" {
-  description = "Reglas de firewall creadas"
+  description = "Reglas de firewall creadas (Fase 2)"
   value = [
-    google_compute_firewall.allow_internal.name,
-    google_compute_firewall.allow_ssh.name,
-    google_compute_firewall.allow_icmp.name,
-    google_compute_firewall.allow_http_https.name,
-    google_compute_firewall.restrict_visitas.name
+    # Reglas de aislamiento
+    google_compute_firewall.deny_visitas_to_internal.name,
+    # Reglas de TI
+    google_compute_firewall.allow_ti_to_all.name,
+    google_compute_firewall.deny_others_to_ti.name,
+    # Reglas de Web
+    google_compute_firewall.allow_web_internal.name,
+    google_compute_firewall.deny_web_from_internet.name,
+    google_compute_firewall.deny_web_from_visitas.name,
+    # Reglas de LDAP
+    google_compute_firewall.allow_ldap_internal.name,
+    google_compute_firewall.deny_ldap_from_visitas.name,
+    # Reglas de DNS
+    google_compute_firewall.allow_dns_internal.name,
+    google_compute_firewall.deny_dns_from_visitas.name,
+    # Reglas de SSH
+    google_compute_firewall.allow_ssh_from_ventas.name,
+    google_compute_firewall.allow_ssh_from_ti.name,
+    google_compute_firewall.deny_ssh_from_visitas.name,
+    google_compute_firewall.deny_ssh_from_internet.name,
+    # Hardening
+    google_compute_firewall.deny_non_essential_ports.name,
+    # Tráfico interno
+    google_compute_firewall.allow_internal_authorized.name
   ]
 }
