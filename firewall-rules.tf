@@ -144,6 +144,21 @@ resource "google_compute_firewall" "allow_https_dmz2" {
   description   = "Permite HTTPS DMZ"
 }
 
+resource "google_compute_firewall" "allow_http_https_dmz_server" {
+  name    = "allow-http-https-dmz-server"
+  network = google_compute_network.main_vpc.name
+  priority = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["dmz-server", "http-server", "https-server"]
+  description   = "Permite HTTP/HTTPS desde Internet hacia DMZ Server"
+}
+
 # =============================================================================
 # 3. SSH/IAP
 # =============================================================================

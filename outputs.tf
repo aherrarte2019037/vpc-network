@@ -77,10 +77,9 @@ output "firewall_rules" {
     # Reglas de aislamiento
     google_compute_firewall.deny_visitas_to_internal.name,
     # Reglas de TI
-    google_compute_firewall.allow_ti_to_all.name,
     google_compute_firewall.deny_others_to_ti.name,
     # Reglas de Web
-    google_compute_firewall.allow_web_internal.name,
+    google_compute_firewall.allow_internal_traffic.name,
     google_compute_firewall.deny_web_from_internet.name,
     google_compute_firewall.deny_web_from_visitas.name,
     # Reglas de LDAP
@@ -95,14 +94,14 @@ output "firewall_rules" {
     google_compute_firewall.deny_ssh_from_visitas.name,
     google_compute_firewall.deny_ssh_from_internet.name,
     # Hardening
-    google_compute_firewall.deny_non_essential_ports.name,
+    google_compute_firewall.deny_non_essential_ports_from_internet.name,
     # Tráfico interno
-    google_compute_firewall.allow_internal_authorized.name,
     # SNMP - Fase 3
     google_compute_firewall.allow_snmp_from_ti.name,
     google_compute_firewall.deny_snmp_from_others.name
   ]
 }
+
 
 # =============================================================================
 # OUTPUTS DE INSTANCIAS - FASE 2
