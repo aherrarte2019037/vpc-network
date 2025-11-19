@@ -90,3 +90,45 @@ output "firewall_rules" {
     google_compute_firewall.allow_internal_authorized.name
   ]
 }
+
+# =============================================================================
+# OUTPUTS DE INSTANCIAS - FASE 2
+# =============================================================================
+
+# Servidores de la Fase 2
+output "dns_server_ip" {
+  description = "IP interna del servidor DNS"
+  value       = google_compute_instance.dns.network_interface[0].network_ip
+}
+
+output "ldap_server_ip" {
+  description = "IP interna del servidor LDAP"
+  value       = google_compute_instance.ldap_server.network_interface[0].network_ip
+}
+
+output "rrhh_server_ip" {
+  description = "IP interna del servidor web de RRHH"
+  value       = google_compute_instance.rrhh_server.network_interface[0].network_ip
+}
+
+# VMs de prueba
+output "ventas_vm_internal_ip" {
+  description = "IP interna de la VM de Ventas"
+  value       = google_compute_instance.ventas_test.network_interface[0].network_ip
+}
+
+output "ti_vm_internal_ip" {
+  description = "IP interna de la VM de TI"
+  value       = google_compute_instance.ti_test.network_interface[0].network_ip
+}
+
+# Instancias de prueba opcionales
+# output "datacenter_vm_internal_ip" {
+#   description = "IP interna de la VM de Data Center"
+#   value       = google_compute_instance.datacenter_test.network_interface[0].network_ip
+# }
+# 
+# output "rrhh_vm_internal_ip" {
+#   description = "IP interna de la VM de prueba de RRHH"
+#   value       = google_compute_instance.rrhh_test.network_interface[0].network_ip
+# }
