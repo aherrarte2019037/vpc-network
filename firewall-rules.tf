@@ -1,23 +1,20 @@
 # firewall-rules.tf
-# Reglas de firewall para la Fase 2 - Seguridad y Control de Acceso
+# Reglas de firewall completas para la VPC "vpc-network"
 # Implementado por: Angel Herrarte
 
 # Variables locales para rangos de subredes
 locals {
+  visitas_cidr    = "10.0.0.0/26"
   ventas_cidr     = "10.0.0.64/27"
   ti_cidr         = "10.0.0.96/27"
   datacenter_cidr = "10.0.0.128/28"
-  visitas_cidr    = "10.0.0.0/26"
-  
-  # Subredes internas (excluyendo Visitas)
+
   internal_subnets = [
     local.ventas_cidr,
     local.ti_cidr,
     local.datacenter_cidr
   ]
-  
-  # Subredes que pueden acceder a servicios internos (Ventas, TI, RRHH)
-  # Nota: RRHH está en Ventas o puede ser una subred adicional, asumimos Ventas
+
   authorized_subnets = [
     local.ventas_cidr,
     local.ti_cidr,
@@ -26,211 +23,12 @@ locals {
 }
 
 # =============================================================================
-# 1. REGLAS DE AISLAMIENTO DE VISITAS
+# 1. DNS
 # =============================================================================
-
-# Bloquear acceso de Visitas a todas las subredes internas (excepto Internet vía NAT)
-resource "google_compute_firewall" "deny_visitas_to_internal" {
-  name     = "deny-visitas-to-internal"
-  network  = google_compute_network.main_vpc.name
-  priority = 1000
-
-  deny {
-    protocol = "tcp"
-  }
-
-  deny {
-    protocol = "udp"
-  }
-
-  deny {
-    protocol = "icmp"
-  }
-
-  source_ranges      = [local.visitas_cidr]
-  destination_ranges = [
-    local.ventas_cidr,
-    local.ti_cidr,
-    local.datacenter_cidr
-  ]
-
-  description = "Fase 2: Bloquea completamente el acceso de Visitas a todas las subredes internas"
-}
-
-# =============================================================================
-# 2. POLÍTICAS DE ACCESO PARA TI
-# =============================================================================
-
-# Permitir que TI acceda a todas las subredes
-resource "google_compute_firewall" "allow_ti_to_all" {
-  name    = "allow-ti-to-all-subnets"
-  network = google_compute_network.main_vpc.name
-  priority = 500
-
-  allow {
-    protocol = "tcp"
-    ports    = ["0-65535"]
-  }
-
-  allow {
-    protocol = "udp"
-    ports    = ["0-65535"]
-  }
-
-  allow {
-    protocol = "icmp"
-  }
-
-  source_ranges = [local.ti_cidr]
-  destination_ranges = [
-    local.ventas_cidr,
-    local.ti_cidr,
-    local.datacenter_cidr,
-    local.visitas_cidr
-  ]
-
-  description = "Fase 2: Permite que TI acceda a todas las subredes"
-}
-
-# Bloquear acceso a TI desde otras subredes (excepto TI mismo)
-resource "google_compute_firewall" "deny_others_to_ti" {
-  name     = "deny-others-to-ti"
-  network  = google_compute_network.main_vpc.name
-  priority = 1000
-
-  deny {
-    protocol = "tcp"
-  }
-
-  deny {
-    protocol = "udp"
-  }
-
-  deny {
-    protocol = "icmp"
-  }
-
-  source_ranges      = [
-    local.ventas_cidr,
-    local.datacenter_cidr,
-    local.visitas_cidr
-  ]
-  destination_ranges = [local.ti_cidr]
-
-  description = "Fase 2: Bloquea el acceso a TI desde otras subredes (excepto TI mismo)"
-}
-
-# =============================================================================
-# 3. REGLAS PARA SERVIDOR WEB INTERNO
-# =============================================================================
-
-# Permitir acceso HTTP/HTTPS al servidor web interno desde subredes autorizadas
-resource "google_compute_firewall" "allow_web_internal" {
-  name    = "allow-web-internal"
-  network = google_compute_network.main_vpc.name
-  priority = 500
-
-  allow {
-    protocol = "tcp"
-    ports    = ["80", "443"]
-  }
-
-  source_ranges = local.authorized_subnets
-  target_tags   = ["web-server-internal"]
-  description   = "Fase 2: Permite acceso HTTP/HTTPS al servidor web interno desde Ventas, TI y RRHH"
-}
-
-# Bloquear acceso al servidor web desde Internet
-resource "google_compute_firewall" "deny_web_from_internet" {
-  name     = "deny-web-from-internet"
-  network  = google_compute_network.main_vpc.name
-  priority = 1000
-
-  deny {
-    protocol = "tcp"
-    ports    = ["80", "443"]
-  }
-
-  source_ranges  = ["0.0.0.0/0"]
-  target_tags    = ["web-server-internal"]
-  description    = "Fase 2: Bloquea acceso al servidor web interno desde Internet"
-}
-
-# Bloquear acceso al servidor web desde Visitas
-resource "google_compute_firewall" "deny_web_from_visitas" {
-  name     = "deny-web-from-visitas"
-  network  = google_compute_network.main_vpc.name
-  priority = 1000
-
-  deny {
-    protocol = "tcp"
-    ports    = ["80", "443"]
-  }
-
-  source_ranges  = [local.visitas_cidr]
-  target_tags    = ["web-server-internal"]
-  description    = "Fase 2: Bloquea acceso al servidor web interno desde subred de Visitas"
-}
-
-# =============================================================================
-# 4. REGLAS PARA LDAP
-# =============================================================================
-
-# Permitir acceso LDAP desde subredes autorizadas hacia Data Center
-resource "google_compute_firewall" "allow_ldap_internal" {
-  name    = "allow-ldap-internal"
-  network = google_compute_network.main_vpc.name
-  priority = 500
-
-  allow {
-    protocol = "tcp"
-    ports    = ["389", "636"]  # LDAP y LDAPS
-  }
-
-  allow {
-    protocol = "udp"
-    ports    = ["389"]  # LDAP
-  }
-
-  source_ranges      = local.authorized_subnets
-  destination_ranges = [local.datacenter_cidr]
-  target_tags        = ["ldap-server"]
-
-  description = "Fase 2: Permite acceso LDAP/LDAPS desde Ventas, TI y RRHH hacia Data Center"
-}
-
-# Bloquear acceso LDAP desde Visitas
-resource "google_compute_firewall" "deny_ldap_from_visitas" {
-  name     = "deny-ldap-from-visitas"
-  network  = google_compute_network.main_vpc.name
-  priority = 1000
-
-  deny {
-    protocol = "tcp"
-    ports    = ["389", "636"]
-  }
-
-  deny {
-    protocol = "udp"
-    ports    = ["389"]
-  }
-
-  source_ranges      = [local.visitas_cidr]
-  destination_ranges = [local.datacenter_cidr]
-  target_tags        = ["ldap-server"]
-
-  description = "Fase 2: Bloquea acceso LDAP desde subred de Visitas"
-}
-
-# =============================================================================
-# 5. REGLAS PARA DNS
-# =============================================================================
-
-# Permitir acceso DNS desde todas las subredes internas
 resource "google_compute_firewall" "allow_dns_internal" {
-  name    = "allow-dns-internal"
-  network = google_compute_network.main_vpc.name
-  priority = 500
+  name         = "allow-dns-internal"
+  network      = google_compute_network.main_vpc.name
+  priority     = 500
 
   allow {
     protocol = "tcp"
@@ -245,15 +43,13 @@ resource "google_compute_firewall" "allow_dns_internal" {
   source_ranges      = local.internal_subnets
   destination_ranges = [local.datacenter_cidr]
   target_tags        = ["dns-server"]
-
-  description = "Fase 2: Permite acceso DNS desde todas las subredes internas hacia Data Center"
+  description        = "Permite acceso DNS interno"
 }
 
-# Bloquear acceso DNS desde Visitas
 resource "google_compute_firewall" "deny_dns_from_visitas" {
-  name     = "deny-dns-from-visitas"
-  network  = google_compute_network.main_vpc.name
-  priority = 1000
+  name         = "deny-dns-from-visitas"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
 
   deny {
     protocol = "tcp"
@@ -267,35 +63,192 @@ resource "google_compute_firewall" "deny_dns_from_visitas" {
 
   source_ranges      = [local.visitas_cidr]
   destination_ranges = [local.datacenter_cidr]
-  target_tags      = ["dns-server"]
-
-  description = "Fase 2: Bloquea acceso DNS desde subred de Visitas"
+  target_tags        = ["dns-server"]
+  description        = "Bloquea DNS desde visitas"
 }
 
 # =============================================================================
-# 6. REGLAS PARA SSH
+# 2. HTTP/HTTPS DMZ
 # =============================================================================
+resource "google_compute_firewall" "allow_http_dmz" {
+  name         = "allow-http-dmz"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
 
-# Permitir SSH desde Ventas hacia instancias (la validación LDAP se hace en las instancias)
-resource "google_compute_firewall" "allow_ssh_from_ventas" {
-  name    = "allow-ssh-from-ventas"
-  network = google_compute_network.main_vpc.name
-  priority = 500
+  allow {
+    protocol = "tcp"
+    ports    = ["80"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["dmz-web"]
+  description   = "Permite HTTP desde Internet hacia DMZ"
+}
+
+resource "google_compute_firewall" "allow_https_dmz" {
+  name         = "allow-https-dmz"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["dmz-web"]
+  description   = "Permite HTTPS desde Internet hacia DMZ"
+}
+
+resource "google_compute_firewall" "allow_http_https" {
+  name         = "allow-http-https"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["web-server"]
+  description   = "Permite HTTP/HTTPS público"
+}
+
+resource "google_compute_firewall" "allow_http_internal" {
+  name         = "allow-http-internal"
+  network      = google_compute_network.main_vpc.name
+  priority     = 900
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80"]
+  }
+
+  source_ranges = local.internal_subnets
+  description   = "Permite HTTP interno"
+}
+
+resource "google_compute_firewall" "allow_https_dmz2" {
+  name         = "allow-https-dmz"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["dmz-web"]
+  description   = "Permite HTTPS DMZ"
+}
+
+# =============================================================================
+# 3. SSH/IAP
+# =============================================================================
+resource "google_compute_firewall" "allow_iap_ssh" {
+  name         = "allow-iap-ssh"
+  network      = google_compute_network.main_vpc.name
+  priority     = 50
 
   allow {
     protocol = "tcp"
     ports    = ["22"]
   }
 
-  source_ranges = [local.ventas_cidr]
-  description   = "Fase 2: Permite SSH desde Ventas (la autenticación LDAP se valida en las instancias)"
+  source_ranges = ["35.235.240.0/20"]
+  description   = "SSH desde IAP"
 }
 
-# Permitir SSH desde TI (TI tiene acceso completo)
+resource "google_compute_firewall" "allow_iap_ssh_vpc_network" {
+  name         = "allow-iap-ssh-vpc-network"
+  network      = google_compute_network.main_vpc.name
+  priority     = 50
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["35.235.240.0/20"]
+  description   = "SSH IAP dentro de la VPC"
+}
+
+resource "google_compute_firewall" "allow_ssh" {
+  name         = "allow-ssh"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["0.0.0.0/0", "35.235.240.0/20"]
+  description   = "SSH global"
+}
+
+resource "google_compute_firewall" "allow_ssh_admin" {
+  name         = "allow-ssh-admin"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = local.internal_subnets
+  description   = "SSH admin"
+}
+
+resource "google_compute_firewall" "allow_ssh_from_iap" {
+  name         = "allow-ssh-from-iap"
+  network      = google_compute_network.main_vpc.name
+  priority     = 800
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["35.235.240.0/20"]
+  description   = "SSH desde IAP"
+}
+
+resource "google_compute_firewall" "allow_ssh_from_me_no_tag_temp" {
+  name         = "allow-ssh-from-me-no-tag-temp"
+  network      = google_compute_network.main_vpc.name
+  priority     = 50
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["181.209.195.17/32"]
+  description   = "SSH desde IP temporal"
+}
+
+resource "google_compute_firewall" "allow_ssh_from_me_v2" {
+  name         = "allow-ssh-from-me-v2"
+  network      = google_compute_network.main_vpc.name
+  priority     = 80
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["190.56.194.12/32"]
+  description   = "SSH desde IP personal v2"
+}
+
 resource "google_compute_firewall" "allow_ssh_from_ti" {
-  name    = "allow-ssh-from-ti"
-  network = google_compute_network.main_vpc.name
-  priority = 500
+  name         = "allow-ssh-from-ti"
+  network      = google_compute_network.main_vpc.name
+  priority     = 500
 
   allow {
     protocol = "tcp"
@@ -303,93 +256,43 @@ resource "google_compute_firewall" "allow_ssh_from_ti" {
   }
 
   source_ranges = [local.ti_cidr]
-  description   = "Fase 2: Permite SSH desde TI (acceso completo)"
+  description   = "SSH desde TI"
 }
 
-# Bloquear SSH desde Visitas
-resource "google_compute_firewall" "deny_ssh_from_visitas" {
-  name     = "deny-ssh-from-visitas"
-  network  = google_compute_network.main_vpc.name
-  priority = 1000
+resource "google_compute_firewall" "allow_ssh_from_ventas" {
+  name         = "allow-ssh-from-ventas"
+  network      = google_compute_network.main_vpc.name
+  priority     = 500
 
-  deny {
+  allow {
     protocol = "tcp"
     ports    = ["22"]
   }
 
-  source_ranges = [local.visitas_cidr]
-  description   = "Fase 2: Bloquea SSH desde subred de Visitas"
-}
-
-# Bloquear SSH desde Internet (solo permitir desde subredes internas)
-# Nota: Esta regla bloquea SSH desde Internet. Las reglas allow-ssh-from-ventas
-# y allow-ssh-from-ti tienen mayor prioridad (500) y permiten SSH desde subredes internas.
-# En GCP, menor número de prioridad = mayor precedencia, así que las reglas ALLOW (500)
-# se evalúan antes que esta DENY (900).
-resource "google_compute_firewall" "deny_ssh_from_internet" {
-  name     = "deny-ssh-from-internet"
-  network  = google_compute_network.main_vpc.name
-  priority = 900  # Menor precedencia que las reglas ALLOW (500) - se evalúa después
-
-  deny {
-    protocol = "tcp"
-    ports    = ["22"]
-  }
-
-  # Bloquear desde Internet
-  # Las reglas ALLOW (prioridad 500) para Ventas y TI se evalúan primero y permiten SSH
-  # desde esas subredes. Esta regla solo bloquea SSH desde otras fuentes (Internet).
-  source_ranges = ["0.0.0.0/0"]
-  description   = "Fase 2: Bloquea SSH desde Internet (las reglas allow-ssh-from-* tienen precedencia para subredes internas)"
+  source_ranges = [local.ventas_cidr]
+  description   = "SSH desde Ventas"
 }
 
 # =============================================================================
-# 7. HARDENING - Bloquear puertos no esenciales desde Internet
+# 4. ICMP / Tráfico interno
 # =============================================================================
+resource "google_compute_firewall" "allow_icmp" {
+  name         = "allow-icmp"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
 
-# Nota: En GCP, el hardening de puertos se realiza principalmente a través de
-# reglas específicas que solo permiten servicios necesarios. Las reglas anteriores
-# ya implementan este principio al ser específicas por servicio.
-# 
-# Esta regla adicional bloquea puertos no esenciales desde Internet, pero permite
-# las reglas específicas de servicios (SSH, DNS, HTTP, HTTPS, LDAP) que tienen
-# mayor prioridad (500) o menor (400).
-#
-# IMPORTANTE: Esta regla tiene prioridad 900, menor que las reglas ALLOW (400-500)
-# para que las reglas específicas de servicios tengan precedencia.
-resource "google_compute_firewall" "deny_non_essential_ports" {
-  name     = "deny-non-essential-ports-from-internet"
-  network  = google_compute_network.main_vpc.name
-  priority = 900  # Menor que las reglas ALLOW para que tengan precedencia
-
-  deny {
-    protocol = "tcp"
-    # Bloquear todos los puertos excepto los esenciales (22, 53, 80, 443, 389, 636)
-    # Pero las reglas ALLOW específicas tienen precedencia
-    ports    = ["0-21", "23-51", "54-79", "81-442", "444-636", "637-65535"]
-  }
-
-  deny {
-    protocol = "udp"
-    # Bloquear todos los puertos UDP excepto DNS (53)
-    ports    = ["0-52", "54-65535"]
+  allow {
+    protocol = "icmp"
   }
 
   source_ranges = ["0.0.0.0/0"]
-  description   = "Fase 2: Hardening - Bloquea puertos no esenciales desde Internet (las reglas ALLOW específicas tienen precedencia)"
+  description   = "Permite ICMP desde cualquier origen"
 }
 
-# =============================================================================
-# 8. ACTUALIZAR REGLA DE TRÁFICO INTERNO (sin Visitas)
-# =============================================================================
-
-# Reemplazar la regla allow-internal existente para excluir Visitas y TI como destino
-# Esta regla permite tráfico interno solo entre subredes autorizadas, pero excluye TI como destino
-# (TI solo puede ser accedido desde TI mismo según los requisitos)
-resource "google_compute_firewall" "allow_internal_authorized" {
-  name    = "allow-internal-authorized"
-  network = google_compute_network.main_vpc.name
-  priority = 400
+resource "google_compute_firewall" "allow_internal_traffic" {
+  name         = "allow-internal-traffic"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
 
   allow {
     protocol = "tcp"
@@ -405,12 +308,326 @@ resource "google_compute_firewall" "allow_internal_authorized" {
     protocol = "icmp"
   }
 
-  source_ranges = local.internal_subnets
-  # Excluir TI del destino: solo Ventas y Data Center pueden comunicarse entre sí
+  source_ranges      = local.internal_subnets
   destination_ranges = [
     local.ventas_cidr,
+    local.ti_cidr,
+    local.datacenter_cidr,
+    local.visitas_cidr
+  ]
+
+  description = "Permite todo el tráfico interno"
+}
+
+# =============================================================================
+# 5. LDAP / SNMP / Otros
+# =============================================================================
+resource "google_compute_firewall" "allow_ldap_ingress" {
+  name         = "allow-ldap-ingress"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["389"]
+  }
+
+  source_ranges = [
+    local.visitas_cidr,
+    local.ventas_cidr,
+    local.ti_cidr,
     local.datacenter_cidr
   ]
 
-  description = "Fase 2: Permite tráfico interno entre Ventas y Data Center - excluye Visitas y TI como destino"
+  target_tags = ["ldap-server"]
+  description = "Permite LDAP desde todas las subredes"
+}
+
+resource "google_compute_firewall" "allow_ldap_internal" {
+  name         = "allow-ldap-internal"
+  network      = google_compute_network.main_vpc.name
+  priority     = 500
+
+  allow {
+    protocol = "tcp"
+    ports    = ["389", "636"]
+  }
+
+  allow {
+    protocol = "udp"
+    ports    = ["389"]
+  }
+
+  source_ranges      = local.authorized_subnets
+  destination_ranges = [local.datacenter_cidr]
+  target_tags        = ["ldap-server"]
+  description        = "LDAP interno autorizado"
+}
+
+resource "google_compute_firewall" "allow_snmp_from_ti" {
+  name         = "allow-snmp-from-ti"
+  network      = google_compute_network.main_vpc.name
+  priority     = 500
+
+  allow {
+    protocol = "tcp"
+    ports    = ["161"]
+  }
+
+  allow {
+    protocol = "udp"
+    ports    = ["161"]
+  }
+
+  source_ranges = [local.ti_cidr]
+  description   = "Permite SNMP desde TI"
+}
+
+resource "google_compute_firewall" "deny_snmp_from_others" {
+  name         = "deny-snmp-from-others"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  deny {
+    protocol = "tcp"
+    ports    = ["161"]
+  }
+
+  deny {
+    protocol = "udp"
+    ports    = ["161"]
+  }
+
+  source_ranges = [
+    local.visitas_cidr,
+    local.ventas_cidr,
+    local.datacenter_cidr
+  ]
+  description   = "Bloquea SNMP desde otras subredes"
+}
+
+resource "google_compute_firewall" "deny_all_dmz" {
+  name         = "deny-all-dmz"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  deny {
+    protocol = "all"
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["dmz-web"]
+  description   = "Bloquea todo el tráfico no permitido hacia DMZ"
+}
+
+resource "google_compute_firewall" "deny_http_external" {
+  name         = "deny-http-external"
+  network      = google_compute_network.main_vpc.name
+  priority     = 910
+
+  deny {
+    protocol = "tcp"
+    ports    = ["90"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  description   = "Bloquea HTTP externo no autorizado"
+}
+
+resource "google_compute_firewall" "deny_ldap_from_visitas" {
+  name         = "deny-ldap-from-visitas"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  deny {
+    protocol = "tcp"
+    ports    = ["389", "636"]
+  }
+
+  deny {
+    protocol = "udp"
+    ports    = ["389"]
+  }
+
+  source_ranges      = [local.visitas_cidr]
+  destination_ranges = [local.datacenter_cidr]
+  target_tags        = ["ldap-server"]
+  description        = "Bloquea LDAP desde visitas"
+}
+
+resource "google_compute_firewall" "deny_non_essential_ports_from_internet" {
+  name         = "deny-non-essential-ports-from-internet"
+  network      = google_compute_network.main_vpc.name
+  priority     = 900
+
+  deny {
+    protocol = "tcp"
+    ports    = ["0-21","23-51","54-79","81-442","444-636","637-65535"]
+  }
+
+  deny {
+    protocol = "udp"
+    ports    = ["0-52","54-65535"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  description   = "Bloquea puertos no esenciales desde Internet"
+}
+
+resource "google_compute_firewall" "deny_others_to_ti" {
+  name         = "deny-others-to-ti"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  deny {
+    protocol = "tcp"
+  }
+
+  deny {
+    protocol = "udp"
+  }
+
+  deny {
+    protocol = "icmp"
+  }
+
+  source_ranges      = [
+    local.visitas_cidr,
+    local.ventas_cidr,
+    local.datacenter_cidr
+  ]
+  destination_ranges = [local.ti_cidr]
+  description        = "Bloquea acceso a TI desde otras subredes"
+}
+
+resource "google_compute_firewall" "deny_ssh_from_internet" {
+  name         = "deny-ssh-from-internet"
+  network      = google_compute_network.main_vpc.name
+  priority     = 900
+
+  deny {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  description   = "Bloquea SSH desde Internet"
+}
+
+resource "google_compute_firewall" "deny_ssh_from_visitas" {
+  name         = "deny-ssh-from-visitas"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  deny {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = [local.visitas_cidr]
+  description   = "Bloquea SSH desde visitas"
+}
+
+resource "google_compute_firewall" "deny_visitas_to_internal" {
+  name         = "deny-visitas-to-internal"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  deny {
+    protocol = "tcp"
+  }
+
+  deny {
+    protocol = "udp"
+  }
+
+  deny {
+    protocol = "icmp"
+  }
+
+  source_ranges      = [local.visitas_cidr]
+  destination_ranges = local.internal_subnets
+  description        = "Bloquea visitas a subredes internas"
+}
+
+resource "google_compute_firewall" "deny_web_from_internet" {
+  name         = "deny-web-from-internet"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  deny {
+    protocol = "tcp"
+    ports    = ["80","443"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["web-server-internal"]
+  description   = "Bloquea web desde Internet"
+}
+
+resource "google_compute_firewall" "deny_web_from_visitas" {
+  name         = "deny-web-from-visitas"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  deny {
+    protocol = "tcp"
+    ports    = ["80","443"]
+  }
+
+  source_ranges = [local.visitas_cidr]
+  target_tags   = ["web-server-internal"]
+  description   = "Bloquea web desde visitas"
+}
+
+resource "google_compute_firewall" "restrict_visitas_to_internal" {
+  name         = "restrict-visitas-to-internal"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "udp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "icmp"
+  }
+
+  source_ranges      = [local.visitas_cidr]
+  destination_ranges = local.internal_subnets
+  description        = "Restricción de visitas"
+}
+
+resource "google_compute_firewall" "vpc_network_allow_http" {
+  name         = "vpc-network-allow-http"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  description   = "Permite HTTP VPC por defecto"
+}
+
+resource "google_compute_firewall" "vpc_network_allow_https" {
+  name         = "vpc-network-allow-https"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  description   = "Permite HTTPS VPC por defecto"
 }
