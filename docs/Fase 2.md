@@ -71,7 +71,66 @@ gcloud compute firewall-rules list --filter="name~dns" --format="table(name,sour
 ---
 
 ## 2. Pruebas de LDAP
-*(Por agregar)*
+
+### 2.1 Verificar servicio LDAP
+
+```bash
+# Verificar que slapd está corriendo
+gcloud compute ssh ldap-server --zone=us-central1-a --tunnel-through-iap --command="systemctl status slapd | head -5"
+
+# Verificar que escucha en puerto 389
+gcloud compute ssh ldap-server --zone=us-central1-a --tunnel-through-iap --command="ss -lptn | grep ':389'"
+```
+
+### 2.2 Verificar estructura LDAP
+
+```bash
+# Obtener IP del servidor LDAP
+LDAP_IP=$(terraform output -raw ldap_server_ip)
+
+# Verificar namingContext
+gcloud compute ssh ldap-server --zone=us-central1-a --tunnel-through-iap --command="ldapsearch -x -s base -b '' namingContexts"
+
+# Verificar OUs y grupos
+gcloud compute ssh ldap-server --zone=us-central1-a --tunnel-through-iap --command="ldapsearch -x -b 'dc=x,dc=local' '(objectclass=organizationalUnit)' dn"
+
+# Verificar usuarios
+gcloud compute ssh ldap-server --zone=us-central1-a --tunnel-through-iap --command="ldapsearch -x -b 'dc=x,dc=local' '(uid=*)' dn uidNumber gidNumber"
+```
+
+**Resultado esperado:**
+- namingContext: `dc=x,dc=local`
+- OUs: `ou=rrhh`, `ou=ventas`
+- Grupos: `cn=rrhh`, `cn=ventas`, `cn=ti-admins`
+- Usuarios: `user1`, `user2`, `user3`, `user4`
+
+### 2.3 Verificar firewall
+
+```bash
+# Verificar reglas de firewall para LDAP
+gcloud compute firewall-rules list --filter="name~ldap" --format="table(name,sourceRanges.list(),targetTags.list())"
+```
+
+**Resultado esperado:**
+- `allow-ldap-internal` permite desde Ventas, TI, Data Center
+- `deny-ldap-from-visitas` bloquea desde Visitas
+
+### 2.4 Probar autenticación con usuarios LDAP
+
+```bash
+# Obtener IP del servidor LDAP
+LDAP_IP=$(terraform output -raw ldap_server_ip)
+
+# Verificar que el cliente puede conectarse al servidor LDAP
+gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --command="ldapsearch -x -H ldap://$LDAP_IP -b 'dc=x,dc=local' '(uid=user1)' dn"
+
+# Verificar autenticación de usuario (si SSSD está configurado)
+gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --command="getent passwd user1 || id user1 2>&1 || echo 'SSSD no configurado aún'"
+```
+
+**Resultado esperado:**
+- Conexión LDAP exitosa desde el cliente
+- Si SSSD está configurado: debe resolver `user1` con uidNumber y gidNumber
 
 ## 3. Pruebas del Servidor Web Interno (RRHH)
 *(Por agregar)*
