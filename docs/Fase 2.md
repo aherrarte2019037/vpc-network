@@ -247,5 +247,81 @@ gcloud compute firewall-rules list --filter="name~dns OR name~ldap OR name~web" 
 - Servicios bloquean acceso desde Visitas (prioridad 1000)
 
 ## 5. Pruebas de NAT
-*(Por agregar)*
+
+### 5.1 Verificar configuración de NAT
+
+```bash
+# Verificar que Cloud NAT está configurado
+gcloud compute routers nats describe main-nat --router=main-router --region=us-central1 --format="yaml"
+
+# Verificar IPs NAT asignadas
+gcloud compute routers nats describe main-nat --router=main-router --region=us-central1 --format="value(natIps)"
+```
+
+**Resultado esperado:**
+- NAT configurado para todas las subredes (`ALL_SUBNETWORKS_ALL_IP_RANGES`)
+- Al menos una IP NAT asignada automáticamente
+
+### 5.2 Verificar que las instancias no tienen IP externa
+
+```bash
+# Verificar que las instancias no tienen IP externa (usan NAT)
+gcloud compute instances list --filter="networkInterfaces.network:$(terraform output -raw vpc_name)" --format="table(name,zone,networkInterfaces[0].networkIP,networkInterfaces[0].accessConfigs[0].natIP)"
+```
+
+**Resultado esperado:**
+- Las instancias tienen IP interna pero NO tienen IP externa (natIP vacío)
+- Todas las instancias usan NAT para salida a Internet
+
+### 5.3 Probar acceso a Internet desde Ventas
+
+```bash
+# Probar resolución DNS externa desde Ventas
+gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --command="nslookup google.com 8.8.8.8"
+
+# Probar acceso HTTP a Internet desde Ventas
+gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --command="curl -s -o /dev/null -w '%{http_code}' http://www.google.com --max-time 5"
+```
+
+**Resultado esperado:**
+- Resolución DNS externa exitosa
+- Acceso HTTP a Internet exitoso (código 200 o 301/302)
+
+### 5.4 Probar acceso a Internet desde TI
+
+```bash
+# Probar acceso HTTP a Internet desde TI
+gcloud compute ssh test-ti-vm --zone=us-central1-a --tunnel-through-iap --command="curl -s -o /dev/null -w '%{http_code}' http://www.google.com --max-time 5"
+
+# Verificar IP pública saliente (debe ser la IP del NAT)
+gcloud compute ssh test-ti-vm --zone=us-central1-a --tunnel-through-iap --command="curl -s ifconfig.me"
+```
+
+**Resultado esperado:**
+- Acceso HTTP exitoso
+- IP pública saliente corresponde a una IP NAT asignada
+
+### 5.5 Probar acceso a Internet desde Data Center
+
+```bash
+# Probar acceso HTTP desde servidor DNS (Data Center)
+gcloud compute ssh dns --zone=us-central1-a --tunnel-through-iap --command="curl -s -o /dev/null -w '%{http_code}' http://www.google.com --max-time 5"
+
+# Verificar que puede actualizar paquetes (requiere NAT)
+gcloud compute ssh dns --zone=us-central1-a --tunnel-through-iap --command="sudo apt-get update -qq 2>&1 | head -3"
+```
+
+**Resultado esperado:**
+- Acceso HTTP exitoso desde Data Center
+- Actualización de paquetes exitosa (requiere NAT para descargar paquetes)
+
+### 5.6 Verificar logs de NAT
+
+```bash
+# Verificar que los logs de NAT están habilitados
+gcloud compute routers nats describe main-nat --router=main-router --region=us-central1 --format="value(logConfig)"
+```
+
+**Resultado esperado:**
+- Logs de NAT habilitados (`enable: true`)
 
