@@ -132,6 +132,43 @@ gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --co
 - Conexión LDAP exitosa desde el cliente
 - Si SSSD está configurado: debe resolver `user1` con uidNumber y gidNumber
 
+### 2.5 Verificar integración SSSD y resolución de usuarios
+
+```bash
+# Verificar que SSSD está corriendo
+gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --command="sudo systemctl status sssd --no-pager | head -5"
+
+# Verificar resolución de usuarios LDAP
+gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --command="getent passwd user1"
+
+# Verificar grupos del usuario
+gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --command="id user1"
+
+# Verificar todos los usuarios LDAP
+gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --command="getent passwd user1 user2 user3 user4"
+```
+
+**Resultado esperado:**
+- SSSD activo y corriendo
+- `user1` resuelto con uidNumber: 2001, gidNumber: 1001
+- Grupos: `rrhh` (1001), `ti-admins` (1003)
+- Todos los usuarios LDAP se resuelven correctamente
+
+### 2.6 Verificar configuración SSH con AllowGroups
+
+```bash
+# Verificar que SSH está configurado con AllowGroups
+gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --command="sudo cat /etc/ssh/sshd_config | grep -A 3 'AllowGroups'"
+
+# Verificar que SSH está escuchando
+gcloud compute ssh test-ventas-vm --zone=us-central1-a --tunnel-through-iap --command="sudo ss -lptn | grep ':22'"
+```
+
+**Resultado esperado:**
+- SSH configurado con `AllowGroups rrhh ventas ti-admins`
+- SSH escuchando en puerto 22
+- Solo usuarios de grupos autorizados pueden hacer SSH (con autenticación por contraseña/clave)
+
 ## 3. Pruebas del Servidor Web Interno (RRHH)
 
 ### 3.1 Verificar servicio web

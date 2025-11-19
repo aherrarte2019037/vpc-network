@@ -162,15 +162,14 @@ resource "google_compute_instance" "ventas_test" {
     # No asignamos IP externa para forzar el uso de Cloud NAT
   }
 
+  allow_stopping_for_update = true
+
   metadata = {
     enable-oslogin = "TRUE"
+    ldap-server-ip = google_compute_instance.ldap_server.network_interface[0].network_ip
   }
 
-  metadata_startup_script = <<-EOF
-    #!/bin/bash
-    apt-get update
-    apt-get install -y iputils-ping traceroute net-tools
-  EOF
+  metadata_startup_script = file("${path.module}/scripts/sssd_ldap_client.sh")
 
   tags = ["ventas", "iap-ssh"]
 
@@ -198,15 +197,14 @@ resource "google_compute_instance" "ti_test" {
     # No asignamos IP externa para forzar el uso de Cloud NAT
   }
 
+  allow_stopping_for_update = true
+
   metadata = {
     enable-oslogin = "TRUE"
+    ldap-server-ip = google_compute_instance.ldap_server.network_interface[0].network_ip
   }
 
-  metadata_startup_script = <<-EOF
-    #!/bin/bash
-    apt-get update
-    apt-get install -y iputils-ping traceroute net-tools
-  EOF
+  metadata_startup_script = file("${path.module}/scripts/sssd_ldap_client.sh")
 
   tags = ["ti", "iap-ssh", "ssh-public"]
 
