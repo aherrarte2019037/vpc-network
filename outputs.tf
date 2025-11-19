@@ -11,6 +11,16 @@ output "vpc_id" {
   value       = google_compute_network.main_vpc.id
 }
 
+output "subred_dmz" {
+  description = "Información de la subred DMZ"
+  value = {
+    name    = google_compute_subnetwork.dmz_subnet.name
+    cidr    = google_compute_subnetwork.dmz_subnet.ip_cidr_range
+    gateway = google_compute_subnetwork.dmz_subnet.gateway_address
+    region  = google_compute_subnetwork.dmz_subnet.region
+  }
+}
+
 output "subred_ventas" {
   description = "Información de la subred de Ventas"
   value = {

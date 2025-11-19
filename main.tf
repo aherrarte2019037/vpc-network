@@ -9,6 +9,20 @@ resource "google_compute_network" "main_vpc" {
   description             = "VPC principal para la empresa - Proyecto Redes"
 }
 
+# Subred DMZ
+resource "google_compute_subnetwork" "dmz_subnet" {
+  name          = "subnet-dmz-uscentral1"
+  ip_cidr_range = "10.0.1.0/24"
+  region        = var.region
+  network       = google_compute_network.main_vpc.id
+
+  log_config {
+    aggregation_interval = "INTERVAL_10_MIN"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }
+}
+
 # Subred de Ventas - 10.0.0.64/27
 resource "google_compute_subnetwork" "ventas_subnet" {
   name          = "subnet-ventas-uscentral1-v2"
@@ -72,6 +86,8 @@ resource "google_compute_subnetwork" "visitas_subnet" {
     metadata             = "INCLUDE_ALL_METADATA"
   }
 }
+
+
 
 # =============================================================================
 # REGLAS DE FIREWALL - FASE 1 (DEPRECADAS)
