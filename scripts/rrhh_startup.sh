@@ -59,3 +59,62 @@ systemctl restart apache2
 # Verificar que está corriendo
 systemctl status apache2 --no-pager | head -5
 
+# =============================================================================
+# Configuración SNMPv3 - Fase 3
+# =============================================================================
+# Instalar y configurar SNMPv3
+apt-get install -y snmp snmpd libsnmp-dev -qq 2>/dev/null || true
+systemctl stop snmpd 2>/dev/null || true
+net-snmp-create-v3-user -ro -A snmpauth123 -X snmppriv123 -a SHA -x AES snmpuser 2>/dev/null || true
+
+cat > /etc/snmp/snmpd.conf <<SNMP_EOF
+agentAddress udp:161
+sysLocation "Data Center - RRHH Web Server"
+sysContact "admin@x.local"
+sysName rrhh.x.local
+view systemview included .1.3.6.1.2.1.1
+view systemview included .1.3.6.1.2.1.25.1
+view systemview included .1.3.6.1.4.1
+rouser snmpuser auth
+SNMP_EOF
+
+systemctl enable snmpd
+systemctl start snmpd
+
+# =============================================================================
+# Configuración SNMPv3 - Fase 3
+# =============================================================================
+
+# Instalar SNMP
+apt-get install -y snmp snmpd libsnmp-dev
+
+# Detener SNMP antes de configurar
+systemctl stop snmpd
+
+# Crear usuario SNMPv3 de forma no interactiva
+echo "snmpuser" | net-snmp-create-v3-user -ro -A snmpauth123 -X snmppriv123 -a SHA -x AES snmpuser 2>/dev/null || {
+  service snmpd stop
+  net-snmp-create-v3-user -ro -A snmpauth123 -X snmppriv123 -a SHA -x AES snmpuser <<EOF
+snmpuser
+EOF
+}
+
+# Configurar snmpd.conf
+cat > /etc/snmp/snmpd.conf <<SNMP_EOF
+# SNMPv3 Configuration - Fase 3
+agentAddress udp:161
+sysLocation "Data Center - RRHH Server"
+sysContact "admin@x.local"
+sysName rrhh.x.local
+
+view systemview included .1.3.6.1.2.1.1
+view systemview included .1.3.6.1.2.1.25.1
+view systemview included .1.3.6.1.4.1
+
+rouser snmpuser auth
+SNMP_EOF
+
+# Habilitar y reiniciar SNMP
+systemctl enable snmpd
+systemctl restart snmpd
+

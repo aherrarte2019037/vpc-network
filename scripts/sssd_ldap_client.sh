@@ -100,3 +100,60 @@ systemctl status sssd --no-pager | head -5
 echo "Probando resolución de usuario LDAP..."
 getent passwd user1 || echo "Usuario user1 aún no resuelto (puede tardar unos segundos)"
 
+# =============================================================================
+# Configuración SNMPv3 - Fase 3
+# =============================================================================
+# Instalar y configurar SNMPv3
+apt-get install -y snmp snmpd libsnmp-dev -qq 2>/dev/null || true
+systemctl stop snmpd 2>/dev/null || true
+net-snmp-create-v3-user -ro -A snmpauth123 -X snmppriv123 -a SHA -x AES snmpuser 2>/dev/null || true
+
+# Obtener hostname para sysName
+HOSTNAME=$(hostname)
+
+cat > /etc/snmp/snmpd.conf <<SNMP_EOF
+agentAddress udp:161
+sysLocation "Test VM - $(echo $HOSTNAME | cut -d'-' -f2)"
+sysContact "admin@x.local"
+sysName $HOSTNAME
+view systemview included .1.3.6.1.2.1.1
+view systemview included .1.3.6.1.2.1.25.1
+view systemview included .1.3.6.1.4.1
+rouser snmpuser auth
+SNMP_EOF
+
+systemctl enable snmpd
+systemctl start snmpd
+
+# =============================================================================
+# Configuración SNMPv3 - Fase 3
+# =============================================================================
+
+# Instalar SNMP y herramientas cliente
+apt-get install -y snmp snmpd libsnmp-dev snmp-mibs-downloader
+
+# Detener SNMP antes de configurar (si está corriendo)
+systemctl stop snmpd 2>/dev/null || true
+
+# Crear usuario SNMPv3 de forma no interactiva
+echo "snmpuser" | net-snmp-create-v3-user -ro -A snmpauth123 -X snmppriv123 -a SHA -x AES snmpuser 2>/dev/null || {
+  service snmpd stop
+  net-snmp-create-v3-user -ro -A snmpauth123 -X snmppriv123 -a SHA -x AES snmpuser <<EOF
+snmpuser
+EOF
+}
+
+# Configurar snmpd.conf
+cat > /etc/snmp/snmpd.conf <<SNMP_EOF
+agentAddress udp:161,udp6:[::1]:161
+view all included .1
+rouser snmpuser auth priv
+sysLocation "GCP VPC Network"
+sysContact "admin@x.local"
+sysName $(hostname)
+SNMP_EOF
+
+# Habilitar y reiniciar SNMP
+systemctl enable snmpd
+systemctl restart snmpd
+

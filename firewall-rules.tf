@@ -364,34 +364,33 @@ resource "google_compute_firewall" "allow_ldap_internal" {
   description        = "LDAP interno autorizado"
 }
 
-resource "google_compute_firewall" "allow_snmp_from_ti" {
-  name         = "allow-snmp-from-ti"
-  network      = google_compute_network.main_vpc.name
-  priority     = 500
+# =============================================================================
+# 9. REGLAS PARA SNMP (FASE 3)
+# =============================================================================
 
-  allow {
-    protocol = "tcp"
-    ports    = ["161"]
-  }
+# Permitir SNMP desde TI hacia todas las VMs monitoreadas
+resource "google_compute_firewall" "allow_snmp_from_ti" {
+  name    = "allow-snmp-from-ti"
+  network = google_compute_network.main_vpc.name
+  priority = 500
 
   allow {
     protocol = "udp"
-    ports    = ["161"]
+    ports    = ["161"]  # SNMP
   }
 
   source_ranges = [local.ti_cidr]
-  description   = "Permite SNMP desde TI"
+  target_tags   = ["snmp-enabled"]
+
+  description = "Fase 3: Permite SNMP desde TI hacia VMs monitoreadas"
 }
 
+# Bloquear SNMP desde otras subredes (solo TI puede monitorear)
+# Prioridad 300 para que tenga mayor precedencia que allow-internal-authorized (400)
 resource "google_compute_firewall" "deny_snmp_from_others" {
-  name         = "deny-snmp-from-others"
-  network      = google_compute_network.main_vpc.name
-  priority     = 1000
-
-  deny {
-    protocol = "tcp"
-    ports    = ["161"]
-  }
+  name     = "deny-snmp-from-others"
+  network  = google_compute_network.main_vpc.name
+  priority = 300
 
   deny {
     protocol = "udp"
@@ -399,11 +398,13 @@ resource "google_compute_firewall" "deny_snmp_from_others" {
   }
 
   source_ranges = [
-    local.visitas_cidr,
     local.ventas_cidr,
-    local.datacenter_cidr
+    local.datacenter_cidr,
+    local.visitas_cidr
   ]
-  description   = "Bloquea SNMP desde otras subredes"
+  target_tags = ["snmp-enabled"]
+
+  description = "Fase 3: Bloquea SNMP desde otras subredes (solo TI puede monitorear)"
 }
 
 resource "google_compute_firewall" "deny_all_dmz" {

@@ -84,3 +84,72 @@ systemctl restart named
 # Verificar que está corriendo
 systemctl status named --no-pager
 
+# =============================================================================
+# Configuración SNMP (Fase 3)
+# =============================================================================
+# Instalar y configurar SNMPv3
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y snmp snmpd libsnmp-dev -qq 2>/dev/null || true
+
+# Detener SNMP antes de configurar
+systemctl stop snmpd 2>/dev/null || true
+
+# Crear usuario SNMPv3 (usar SHA en lugar de SHA-256 para compatibilidad)
+net-snmp-create-v3-user -ro -A snmpauth123 -X snmppriv123 -a SHA -x AES snmpuser 2>/dev/null || true
+
+# Configurar snmpd.conf
+cat > /etc/snmp/snmpd.conf <<SNMP_EOF
+# SNMPv3 Configuration - Fase 3
+agentAddress udp:161
+sysLocation "Data Center - DNS Server"
+sysContact "admin@x.local"
+sysName dns.x.local
+
+view systemview included .1.3.6.1.2.1.1
+view systemview included .1.3.6.1.2.1.25.1
+view systemview included .1.3.6.1.4.1
+
+rouser snmpuser auth
+SNMP_EOF
+
+# Habilitar y reiniciar SNMP
+systemctl enable snmpd
+systemctl start snmpd
+
+# Verificar que está corriendo
+sleep 2
+systemctl status snmpd --no-pager | head -5
+
+# =============================================================================
+# Configuración SNMPv3 - Fase 3
+# =============================================================================
+
+# Instalar SNMP
+apt-get install -y snmp snmpd libsnmp-dev
+
+# Detener SNMP antes de configurar
+systemctl stop snmpd
+
+# Crear usuario SNMPv3 de forma no interactiva
+echo "snmpuser" | net-snmp-create-v3-user -ro -A snmpauth123 -X snmppriv123 -a SHA -x AES snmpuser 2>/dev/null || {
+  # Si falla, intentar crear manualmente
+  service snmpd stop
+  net-snmp-create-v3-user -ro -A snmpauth123 -X snmppriv123 -a SHA -x AES snmpuser <<EOF
+snmpuser
+EOF
+}
+
+# Configurar snmpd.conf
+cat > /etc/snmp/snmpd.conf <<SNMP_EOF
+agentAddress udp:161,udp6:[::1]:161
+view all included .1
+rouser snmpuser auth priv
+sysLocation "Data Center, GCP"
+sysContact "admin@x.local"
+sysName $(hostname)
+SNMP_EOF
+
+# Habilitar y reiniciar SNMP
+systemctl enable snmpd
+systemctl restart snmpd
+

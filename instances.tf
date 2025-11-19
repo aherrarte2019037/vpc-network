@@ -36,7 +36,7 @@ resource "google_compute_instance" "dns" {
 
   metadata_startup_script = file("${path.module}/scripts/dns_startup.sh")
 
-  tags = ["dns-server", "datacenter", "iap-ssh"]
+  tags = ["dns-server", "datacenter", "iap-ssh", "snmp-enabled"]
 
   labels = {
     environment = var.environment
@@ -79,7 +79,7 @@ resource "google_compute_instance" "ldap_server" {
 
   metadata_startup_script = file("${path.module}/scripts/ldap_startup.sh")
 
-  tags = ["ldap-server", "datacenter", "iap-ssh"]
+  tags = ["ldap-server", "datacenter", "iap-ssh", "snmp-enabled"]
 
   labels = {
     environment = var.environment
@@ -122,7 +122,7 @@ resource "google_compute_instance" "rrhh_server" {
 
   metadata_startup_script = file("${path.module}/scripts/rrhh_startup.sh")
 
-  tags = ["web-server-internal", "datacenter", "iap-ssh"]
+  tags = ["web-server-internal", "datacenter", "iap-ssh", "snmp-enabled"]
 
   labels = {
     environment = var.environment
@@ -216,7 +216,7 @@ resource "google_compute_instance" "ventas_test" {
 
   metadata_startup_script = file("${path.module}/scripts/sssd_ldap_client.sh")
 
-  tags = ["ventas", "iap-ssh"]
+  tags = ["ventas", "iap-ssh", "snmp-enabled"]
 
   labels = {
     environment = var.environment
@@ -252,7 +252,7 @@ resource "google_compute_instance" "ti_test" {
 
   metadata_startup_script = file("${path.module}/scripts/sssd_ldap_client.sh")
 
-  tags = ["ti", "iap-ssh", "ssh-public"]
+  tags = ["ti", "iap-ssh", "ssh-public", "snmp-enabled"]
 
   labels = {
     environment = var.environment

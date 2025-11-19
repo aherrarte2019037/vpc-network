@@ -97,7 +97,10 @@ output "firewall_rules" {
     # Hardening
     google_compute_firewall.deny_non_essential_ports.name,
     # Tráfico interno
-    google_compute_firewall.allow_internal_authorized.name
+    google_compute_firewall.allow_internal_authorized.name,
+    # SNMP - Fase 3
+    google_compute_firewall.allow_snmp_from_ti.name,
+    google_compute_firewall.deny_snmp_from_others.name
   ]
 }
 
