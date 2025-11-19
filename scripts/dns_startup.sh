@@ -32,9 +32,9 @@ zone "x.local" {
         file "/etc/bind/db.x.local";
 };
 
-zone "3.0.10.in-addr.arpa" {
+zone "0.0.10.in-addr.arpa" {
         type master;
-        file "/etc/bind/db.10.0.3";
+        file "/etc/bind/db.10.0.0";
 };
 LOCAL_EOF
 
@@ -50,13 +50,13 @@ $TTL    604800
 
 @       IN      NS      dns.x.local.
 
-dns     IN      A       10.0.3.10
-rrhh    IN      A       10.0.3.20
-ldap    IN      A       10.0.3.30
+dns     IN      A       10.0.0.139
+rrhh    IN      A       10.0.0.133
+ldap    IN      A       10.0.0.138
 ZONE_EOF
 
-# Configurar zona reverse db.10.0.3
-cat > /etc/bind/db.10.0.3 <<'REVERSE_EOF'
+# Configurar zona reverse db.10.0.0
+cat > /etc/bind/db.10.0.0 <<'REVERSE_EOF'
 $TTL    604800
 @       IN      SOA     dns.x.local. admin.x.local. (
                         2
@@ -67,15 +67,15 @@ $TTL    604800
 
 @       IN      NS      dns.x.local.
 
-10      IN      PTR     dns.x.local.
-20      IN      PTR     rrhh.x.local.
-30      IN      PTR     ldap.x.local.
+139     IN      PTR     dns.x.local.
+133     IN      PTR     rrhh.x.local.
+138     IN      PTR     ldap.x.local.
 REVERSE_EOF
 
 # Verificar configuración
 named-checkconf
 named-checkzone x.local /etc/bind/db.x.local
-named-checkzone 3.0.10.in-addr.arpa /etc/bind/db.10.0.3
+named-checkzone 0.0.10.in-addr.arpa /etc/bind/db.10.0.0
 
 # Habilitar y reiniciar BIND9
 systemctl enable named

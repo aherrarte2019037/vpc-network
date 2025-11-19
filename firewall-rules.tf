@@ -383,8 +383,9 @@ resource "google_compute_firewall" "deny_non_essential_ports" {
 # 8. ACTUALIZAR REGLA DE TRÁFICO INTERNO (sin Visitas)
 # =============================================================================
 
-# Reemplazar la regla allow-internal existente para excluir Visitas
-# Esta regla permite tráfico interno solo entre subredes autorizadas
+# Reemplazar la regla allow-internal existente para excluir Visitas y TI como destino
+# Esta regla permite tráfico interno solo entre subredes autorizadas, pero excluye TI como destino
+# (TI solo puede ser accedido desde TI mismo según los requisitos)
 resource "google_compute_firewall" "allow_internal_authorized" {
   name    = "allow-internal-authorized"
   network = google_compute_network.main_vpc.name
@@ -405,7 +406,11 @@ resource "google_compute_firewall" "allow_internal_authorized" {
   }
 
   source_ranges = local.internal_subnets
-  destination_ranges = local.internal_subnets
+  # Excluir TI del destino: solo Ventas y Data Center pueden comunicarse entre sí
+  destination_ranges = [
+    local.ventas_cidr,
+    local.datacenter_cidr
+  ]
 
-  description = "Fase 2: Permite tráfico interno entre subredes autorizadas (Ventas, TI, Data Center) - excluye Visitas"
+  description = "Fase 2: Permite tráfico interno entre Ventas y Data Center - excluye Visitas y TI como destino"
 }

@@ -120,20 +120,7 @@ resource "google_compute_instance" "rrhh_server" {
     enable-oslogin = "TRUE"
   }
 
-  # Startup script para instalar Apache
-  metadata_startup_script = <<-EOF
-    #!/bin/bash
-    apt-get update
-    apt-get install -y apache2
-    
-    # Crear página HTML básica para RRHH
-    mkdir -p /var/www/html
-    echo "<h1>Sistema de Administración de RRHH</h1>" > /var/www/html/index.html
-    echo "<p>Bienvenido al sistema interno de Recursos Humanos</p>" >> /var/www/html/index.html
-    
-    systemctl enable apache2
-    systemctl start apache2
-  EOF
+  metadata_startup_script = file("${path.module}/scripts/rrhh_startup.sh")
 
   tags = ["web-server-internal", "datacenter", "iap-ssh"]
 
