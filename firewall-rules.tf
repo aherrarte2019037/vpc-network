@@ -288,6 +288,19 @@ resource "google_compute_firewall" "allow_ssh_from_ventas" {
   description   = "SSH desde Ventas"
 }
 
+resource "google_compute_firewall" "allow-ssh-my-ip" {
+  name         = "allow-ssh-my-ip"
+  network      = google_compute_network.main_vpc.name
+  priority     = 1000
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+  source_ranges = ["2803:d100:9910:1bbc:2c78:457e:9:10c3/32"] #cambiar segun la IP PUBLICA IPV6
+  target_tags   = ["dmz-server"]
+  description   = "Permitir SSH desde IP específica"
+}
+
 # =============================================================================
 # 4. ICMP / Tráfico interno
 # =============================================================================

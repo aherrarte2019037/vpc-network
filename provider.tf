@@ -13,6 +13,6 @@ terraform {
 }
 
 provider "google" {
-  project = var.project_id
-  region  = var.region
+  project = "still-smithy-475313-s3"
+  region  = "us-central1"
 }
