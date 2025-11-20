@@ -1,60 +1,102 @@
 graph TB
     Internet((Internet))
     
-    subgraph GCP["Google Cloud Platform"]
+    subgraph GCP["Google Cloud Platform - Proyecto Redes"]
         subgraph VPC["VPC: vpc-network<br/>10.0.0.0/16"]
             Router[Cloud Router<br/>main-router]
             NAT[Cloud NAT<br/>main-nat]
             
-            subgraph Ventas["Subred de Ventas<br/>10.0.1.0/24"]
-                V1[10.0.1.1 Gateway]
-                V2[10.0.1.2 - 10.0.1.254<br/>254 hosts disponibles<br/>25 hosts requeridos]
+            subgraph DMZ["DMZ / Visitas<br/>10.0.0.0/26<br/>10.0.1.0/24"]
+                DMZ_GW[Gateway]
+                WebServer["🌐 Web Server Público<br/>Apache2<br/>HTTP:80 / HTTPS:443<br/>IP: 10.0.1.2<br/>IP Ext: 34.63.41.144"]
             end
             
-            subgraph TI["Subred de TI<br/>10.0.2.0/24"]
-                T1[10.0.2.1 Gateway]
-                T2[10.0.2.2 - 10.0.2.254<br/>254 hosts disponibles<br/>15 hosts requeridos]
+            subgraph Ventas["Subred de Ventas<br/>10.0.0.64/27"]
+                V_GW[Gateway]
+                VentasVM["💻 test-ventas-vm<br/>SSSD/LDAP Client<br/>SNMP Enabled"]
             end
             
-            subgraph DC["Subred de Data Center<br/>10.0.3.0/24"]
-                D1[10.0.3.1 Gateway]
-                D2[10.0.3.2 - 10.0.3.254<br/>254 hosts disponibles<br/>5 hosts requeridos]
+            subgraph TI["Subred de TI<br/>10.0.0.96/27"]
+                T_GW[Gateway]
+                TIVM["💻 test-ti-vm<br/>SSSD/LDAP Client<br/>SNMP Monitoring Station<br/>SSH Public"]
             end
             
-            subgraph Visitas["Subred de Visitas<br/>10.0.4.0/24"]
-                Vi1[10.0.4.1 Gateway]
-                Vi2[10.0.4.2 - 10.0.4.254<br/>Acceso limitado]
+            subgraph DC["Subred de Data Center<br/>10.0.0.128/28"]
+                DC_GW[Gateway]
+                DNSServer["🌐 DNS Server<br/>BIND9<br/>dns.x.local<br/>IP: 10.0.0.137<br/>SNMP Enabled"]
+                LDAPServer["🔐 LDAP Server<br/>OpenLDAP<br/>ldap.x.local<br/>IP: 10.0.0.131<br/>SNMP Enabled"]
+                RRHHServer["🌐 RRHH Web Server<br/>Apache2<br/>rrhh.x.local<br/>IP: 10.0.0.133<br/>SNMP Enabled"]
             end
             
-            FW[Firewall Rules<br/>- allow-internal<br/>- allow-ssh<br/>- allow-icmp<br/>- allow-http-https<br/>- restrict-visitas]
+            FW["🛡️ Firewall Rules<br/>Fase 2 + Fase 3<br/>• DNS, LDAP, SSH<br/>• HTTP/HTTPS DMZ<br/>• SNMP desde TI<br/>• Bloqueo visitas"]
         end
     end
     
-    Internet <-->|NAT| NAT
+    %% Conexiones desde Internet
+    Internet -->|"HTTP/HTTPS<br/>(Puertos 80/443)"| WebServer
+    Internet -.->|"Bloqueado<br/>(Excepto DMZ)"| Ventas
+    Internet -.->|"Bloqueado<br/>(Excepto DMZ)"| TI
+    Internet -.->|"Bloqueado<br/>(Excepto DMZ)"| DC
+    
+    %% NAT y Router
     NAT <--> Router
+    Router <--> DMZ
     Router <--> Ventas
     Router <--> TI
     Router <--> DC
-    Router <--> Visitas
     
-    FW -.->|Controla| Ventas
-    FW -.->|Controla| TI
-    FW -.->|Controla| DC
-    FW -.->|Controla| Visitas
+    %% Control de Firewall
+    FW -.->|"Controla<br/>Tráfico"| DMZ
+    FW -.->|"Controla<br/>Tráfico"| Ventas
+    FW -.->|"Controla<br/>Tráfico"| TI
+    FW -.->|"Controla<br/>Tráfico"| DC
     
-    Ventas <-->|Permitido| TI
-    Ventas <-->|Permitido| DC
-    TI <-->|Permitido| DC
-    Visitas -.->|Bloqueado| TI
-    Visitas -.->|Bloqueado| DC
-    Visitas <-->|Permitido| Ventas
+    %% Conexiones permitidas entre subredes
+    VentasVM <-->|"Comunicación<br/>Permitida"| TIVM
+    VentasVM <-->|"Autenticación<br/>LDAP"| LDAPServer
+    TIVM <-->|"Acceso<br/>Permitido"| DNSServer
+    TIVM <-->|"Acceso<br/>Permitido"| LDAPServer
+    TIVM <-->|"Acceso<br/>Permitido"| RRHHServer
     
-    style VPC fill:#e1f5ff
-    style Ventas fill:#c8e6c9
-    style TI fill:#fff9c4
-    style DC fill:#ffccbc
-    style Visitas fill:#f8bbd0
-    style Router fill:#b3e5fc
-    style NAT fill:#b3e5fc
-    style FW fill:#ffccbc
-    style Internet fill:#90caf9
+    %% Monitoreo SNMP (solo desde TI)
+    TIVM -->|"SNMPv3<br/>UDP:161<br/>Permitido"| DNSServer
+    TIVM -->|"SNMPv3<br/>UDP:161<br/>Permitido"| LDAPServer
+    TIVM -->|"SNMPv3<br/>UDP:161<br/>Permitido"| RRHHServer
+    TIVM -->|"SNMPv3<br/>UDP:161<br/>Permitido"| VentasVM
+    
+    %% Conexiones bloqueadas
+    VentasVM -.->|"SNMP<br/>Bloqueado"| DNSServer
+    VentasVM -.->|"SNMP<br/>Bloqueado"| LDAPServer
+    VentasVM -.->|"SNMP<br/>Bloqueado"| RRHHServer
+    WebServer -.->|"Acceso<br/>Bloqueado"| Ventas
+    WebServer -.->|"Acceso<br/>Bloqueado"| TI
+    WebServer -.->|"Acceso<br/>Bloqueado"| DC
+    
+    %% Servicios DNS internos
+    VentasVM -->|"DNS Query<br/>TCP/UDP:53"| DNSServer
+    TIVM -->|"DNS Query<br/>TCP/UDP:53"| DNSServer
+    RRHHServer -->|"DNS Query<br/>TCP/UDP:53"| DNSServer
+    LDAPServer -->|"DNS Query<br/>TCP/UDP:53"| DNSServer
+    
+    %% VPN (cuando esté implementada)
+    VPN_Note["🔒 VPN Server<br/>(Pendiente)<br/>Autenticación LDAP<br/>OpenVPN/WireGuard"]
+    VPN_Note -.->|"Futuro<br/>LDAP Auth"| LDAPServer
+    
+    %% Estilos
+    style VPC fill:#e1f5ff,stroke:#01579b,stroke-width:3px
+    style DMZ fill:#ffeb3b,stroke:#f57f17,stroke-width:2px
+    style Ventas fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style TI fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    style DC fill:#ffccbc,stroke:#e64a19,stroke-width:2px
+    style Router fill:#b3e5fc,stroke:#0277bd
+    style NAT fill:#b3e5fc,stroke:#0277bd
+    style FW fill:#ffccbc,stroke:#d84315,stroke-width:2px
+    style Internet fill:#90caf9,stroke:#1565c0,stroke-width:2px
+    style WebServer fill:#4caf50,stroke:#1b5e20,stroke-width:2px
+    style DNSServer fill:#ff9800,stroke:#e65100,stroke-width:2px
+    style LDAPServer fill:#ff9800,stroke:#e65100,stroke-width:2px
+    style RRHHServer fill:#ff9800,stroke:#e65100,stroke-width:2px
+    style TIVM fill:#2196f3,stroke:#0d47a1,stroke-width:2px
+    style VentasVM fill:#81c784,stroke:#2e7d32
+    style VPN_Note fill:#9e9e9e,stroke:#424242,stroke-width:2px,stroke-dasharray: 5 5
+
