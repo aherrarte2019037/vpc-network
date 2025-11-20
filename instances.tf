@@ -259,3 +259,39 @@ resource "google_compute_instance" "ti_test" {
     team        = "ti"
   }
 }
+
+# Servidor VPN - en subred de TI
+resource "google_compute_instance" "vpn_server" {
+  name         = "vpn-server"
+  machine_type = "e2-medium"
+  zone         = "${var.region}-a"
+
+  boot_disk {
+    initialize_params {
+      image = "debian-cloud/debian-11"
+      size  = 20
+    }
+  }
+
+  network_interface {
+    # Usamos directamente la subred de TI 
+    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/subnet-ti-uscentral1-v2"
+
+    # IP pública para que los clientes VPN se conecten desde Internet
+    access_config {}
+  }
+
+  allow_stopping_for_update = true
+
+  metadata = {
+    enable-oslogin = "TRUE"
+  }
+
+  tags = ["ti", "iap-ssh", "vpn-server"]
+
+  labels = {
+    environment = var.environment
+    team        = "ti"
+    service     = "vpn"
+  }
+}

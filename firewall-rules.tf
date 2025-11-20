@@ -660,3 +660,27 @@ resource "google_compute_firewall" "vpc_network_allow_https" {
   source_ranges = ["0.0.0.0/0"]
   description   = "Permite HTTPS VPC por defecto"
 }
+
+
+# ============================================================================
+# VPN: Regla para permitir tráfico UDP 1194 hacia vpn-server
+# ============================================================================
+resource "google_compute_firewall" "allow_vpn_from_internet" {
+  name    = "allow-vpn-from-internet"
+  network = google_compute_network.main_vpc.name
+
+  # Prioridad más alta (número más bajo) que reglas DENY generales
+  priority = 500
+
+  allow {
+    protocol = "udp"
+    ports    = ["1194"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+
+  # Solo se aplica a instancias con la etiqueta "vpn-server"
+  target_tags = ["vpn-server"]
+
+  description = "Fase 3: Permite tráfico UDP 1194 (OpenVPN) desde Internet hacia vpn-server"
+}
