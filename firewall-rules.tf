@@ -122,19 +122,6 @@ resource "google_compute_firewall" "allow_ti_to_dmz" {
   description   = "Permite TI hacia DMZ"
 }
 
-resource "google_compute_firewall" "allow_vpn_from_internet" {
-  name    = "allow-vpn-from-internet"
-  network = google_compute_network.main_vpc.name
-  priority = 500
-
-  allow {
-    protocol = "udp"
-    ports    = ["1194"]
-  }
-
-  source_ranges = ["0.0.0.0/0"]
-  description   = "Permite VPN desde Internet"
-}
 
 resource "google_compute_firewall" "deny_internal_to_dmz" {
   name    = "deny-internal-to-dmz"
