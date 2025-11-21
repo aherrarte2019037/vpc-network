@@ -100,6 +100,66 @@ resource "google_compute_firewall" "allow_https_dmz" {
   description   = "Permite HTTPS desde Internet hacia DMZ"
 }
 
+resource "google_compute_firewall" "allow_ti_to_dmz" {
+  name    = "allow-ti-to-dmz"
+  network = google_compute_network.main_vpc.name
+  priority = 200
+
+  allow {
+    protocol = "tcp"
+  }
+
+  allow {
+    protocol = "udp"
+  }
+
+  allow {
+    protocol = "icmp"
+  }
+
+  source_ranges = [local.ti_cidr]
+  target_tags   = ["dmz-web", "dmz-server"]
+  description   = "Permite TI hacia DMZ"
+}
+
+resource "google_compute_firewall" "allow_vpn_from_internet" {
+  name    = "allow-vpn-from-internet"
+  network = google_compute_network.main_vpc.name
+  priority = 500
+
+  allow {
+    protocol = "udp"
+    ports    = ["1194"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  description   = "Permite VPN desde Internet"
+}
+
+resource "google_compute_firewall" "deny_internal_to_dmz" {
+  name    = "deny-internal-to-dmz"
+  network = google_compute_network.main_vpc.name
+  priority = 300
+
+  deny {
+    protocol = "tcp"
+    ports    = ["0-65535"]
+  }
+
+  deny {
+    protocol = "udp"
+    ports    = ["0-65535"]
+  }
+
+  deny {
+    protocol = "icmp"
+  }
+
+  source_ranges      = local.internal_subnets
+  target_tags        = ["dmz-web", "dmz-server"]
+  description        = "Bloquea tráfico interno no autorizado hacia DMZ"
+}
+
 resource "google_compute_firewall" "allow_http_https" {
   name         = "allow-http-https"
   network      = google_compute_network.main_vpc.name
@@ -315,6 +375,69 @@ resource "google_compute_firewall" "allow_icmp" {
 
   source_ranges = ["0.0.0.0/0"]
   description   = "Permite ICMP desde cualquier origen"
+}
+
+resource "google_compute_firewall" "allow_internal_authorized" {
+  name    = "allow-internal-authorized"
+  network = google_compute_network.main_vpc.name
+  priority = 400
+
+  allow {
+    protocol = "tcp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "udp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "icmp"
+  }
+
+  source_ranges      = local.authorized_subnets
+  destination_ranges = local.authorized_subnets
+  description        = "Permite tráfico interno autorizado"
+}
+
+resource "google_compute_firewall" "allow_ti_to_all_subnets" {
+  name    = "allow-ti-to-all-subnets"
+  network = google_compute_network.main_vpc.name
+  priority = 500
+
+  allow {
+    protocol = "tcp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "udp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "icmp"
+  }
+
+  source_ranges      = [local.ti_cidr]
+  destination_ranges = local.internal_subnets
+  description        = "Permite TI hacia todas las subredes"
+}
+
+resource "google_compute_firewall" "allow_web_internal" {
+  name    = "allow-web-internal"
+  network = google_compute_network.main_vpc.name
+  priority = 500
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80","443"]
+  }
+
+  source_ranges = local.internal_subnets
+  target_tags   = ["web-server-internal"]
+  description   = "Permite HTTP/HTTPS interno"
 }
 
 resource "google_compute_firewall" "allow_internal_traffic" {
