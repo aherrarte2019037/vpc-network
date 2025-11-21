@@ -5,7 +5,7 @@ resource "google_compute_network" "main_vpc" {
   name                    = var.vpc_name
   auto_create_subnetworks = false
   routing_mode            = "REGIONAL"
-  description             = "VPC principal para el proyecto empresarial"
+  description = "VPC principal para la empresa - Proyecto Redes"
 }
 
 #########################################
